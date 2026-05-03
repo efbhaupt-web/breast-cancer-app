@@ -3,60 +3,64 @@ import joblib
 import pandas as pd
 
 # -----------------------
-# Configuración de página
+# CONFIG
 # -----------------------
 st.set_page_config(
-    page_title="Predicción de cáncer",
+    page_title="Breast Cancer Prediction",
     page_icon="🧬",
     layout="centered"
 )
 
 # -----------------------
-# Cargar modelo
+# LOAD MODEL
 # -----------------------
-model = joblib.load("modelo.pkl")
-cols = joblib.load("columnas.pkl")
+try:
+    model = joblib.load("modelo.pkl")
+    cols = joblib.load("columnas.pkl")
+except Exception as e:
+    st.error(f"Error loading model files: {e}")
+    st.stop()
 
 # -----------------------
 # HEADER
 # -----------------------
-st.title("🧬 Predicción de cáncer de mama")
-st.markdown("### Modelo de Machine Learning aplicado a datos clínicos")
+st.title("🧬 Breast Cancer Prediction")
+
+st.markdown("""
+### 🧠 What does this tool do?
+
+This model predicts whether a tumor is **benign or malignant**  
+based on morphological cellular features.
+
+⚠️ **Important:** This is an educational model based on the Wisconsin dataset.  
+It does NOT replace professional medical diagnosis.
+""")
 
 st.markdown("---")
 
 # -----------------------
-# INFO
+# INPUTS
 # -----------------------
-st.info(
-    "Esta herramienta utiliza un modelo de regresión logística entrenado "
-    "para clasificar tumores como benignos o malignos."
-)
-
-# -----------------------
-# VARIABLES CLAVE
-# -----------------------
-st.subheader("📊 Parámetros del paciente")
+st.subheader("📊 Patient Parameters")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    worst_radius = st.number_input("Worst radius", value=15.0)
-    worst_perimeter = st.number_input("Worst perimeter", value=100.0)
-    mean_perimeter = st.number_input("Mean perimeter", value=80.0)
+    worst_radius = st.number_input("Worst Radius", value=15.0)
+    worst_perimeter = st.number_input("Worst Perimeter", value=100.0)
+    mean_perimeter = st.number_input("Mean Perimeter", value=80.0)
 
 with col2:
-    worst_concave_points = st.number_input("Worst concave points", value=0.1)
-    mean_concave_points = st.number_input("Mean concave points", value=0.05)
+    worst_concave_points = st.number_input("Worst Concave Points", value=0.1)
+    mean_concave_points = st.number_input("Mean Concave Points", value=0.05)
 
-# -----------------------
-# BOTÓN
-# -----------------------
 st.markdown("---")
 
-if st.button("🔍 Analizar tumor"):
+# -----------------------
+# PREDICTION
+# -----------------------
+if st.button("🔍 Analyze Tumor"):
 
-    # Armar input completo
     inputs_dict = {
         "worst radius": worst_radius,
         "worst perimeter": worst_perimeter,
@@ -65,47 +69,54 @@ if st.button("🔍 Analizar tumor"):
         "mean concave points": mean_concave_points
     }
 
-    full_input = []
+    try:
+        full_input = []
 
-    for col in cols:
-        if col in inputs_dict:
-            full_input.append(inputs_dict[col])
+        for col in cols:
+            if col in inputs_dict:
+                full_input.append(inputs_dict[col])
+            else:
+                full_input.append(0)
+
+        nuevo_df = pd.DataFrame([full_input], columns=cols)
+
+        pred = model.predict(nuevo_df)
+        prob = model.predict_proba(nuevo_df)[0]
+
+        st.markdown("---")
+
+        # RESULT
+        if pred[0] == 0:
+            st.error("⚠️ Result: High probability of MALIGNANT tumor")
         else:
-            full_input.append(0)
+            st.success("✅ Result: High probability of BENIGN tumor")
 
-    nuevo_df = pd.DataFrame([full_input], columns=cols)
+        # PROBABILITIES
+        st.subheader("📈 Model Confidence")
 
-    pred = model.predict(nuevo_df)
-    prob = model.predict_proba(nuevo_df)[0]
+        benign_prob = prob[1] * 100
+        malignant_prob = prob[0] * 100
 
-    st.markdown("---")
+        st.write(f"Benign: {benign_prob:.2f}%")
+        st.write(f"Malignant: {malignant_prob:.2f}%")
 
-    # RESULTADO
-    if pred[0] == 0:
-        st.error("⚠️ Resultado: TUMOR MALIGNO")
-    else:
-        st.success("✅ Resultado: TUMOR BENIGNO")
+        st.progress(float(prob[1]))
 
-    # PROBABILIDAD
-    st.subheader("📈 Probabilidad")
+        # INTERPRETATION
+        st.markdown("---")
+        st.subheader("🧠 Interpretation")
 
-    st.write(f"Benigno: {prob[1]*100:.2f}%")
-    st.write(f"Maligno: {prob[0]*100:.2f}%")
+        st.write("""
+        Higher values in parameters such as **concavity** and **perimeter**  
+        are associated with greater structural irregularity,  
+        which may correlate with malignancy in this dataset.
+        """)
 
-    st.progress(float(prob[1]))
-
-    # INTERPRETACIÓN
-    st.markdown("---")
-    st.subheader("🧠 Interpretación")
-
-    st.write(
-        "El modelo evalúa características morfológicas del tejido. "
-        "Valores elevados en parámetros como concavidad o perímetro "
-        "pueden asociarse con mayor riesgo de malignidad."
-    )
+    except Exception as e:
+        st.error(f"Prediction error: {e}")
 
 # -----------------------
 # FOOTER
 # -----------------------
 st.markdown("---")
-st.caption("Proyecto de Machine Learning aplicado a biomedicina")
+st.caption("Machine Learning Project applied to biomedical data | Educational demo")
